@@ -133,8 +133,31 @@ $(function() {
         print('The Chat Service is not configured. Please check your .env file.', false);
         return;
       }
-      generalChannel.sendMessage($input.val())
+      var file = $('#chat-file')[0].files[0]
+      if (file) {
+        var formData = new FormData()
+        formData.append('media', file)
+        generalChannel.sendMessage(formData)
+      } else {
+        generalChannel.sendMessage($input.val())
+      }
       $input.val('');
     }
+  });
+
+  // Send a new message to the general channel
+  var $load = $('#chat-load')
+  $load.on('click', function(e) {
+    generalChannel.getMessages().then((messages) => {
+      console.log(messages)
+      messages.items.forEach(item => {
+        // console.log(item)
+        if (item.media) {
+          item.media.getContentTemporaryUrl().then(temporaryUrl => {
+            console.log(temporaryUrl)
+          })
+        }
+      })
+    })
   });
 });
