@@ -25,7 +25,7 @@ $(function() {
   }
 
   // Helper function to print chat message to the chat window
-  function printMessage(fromUser, message) {
+  function printMessage(fromUser, message, attachiments) {
     var $user = $('<span class="username">').text(fromUser + ':');
     if (fromUser === username) {
       $user.addClass('me');
@@ -33,6 +33,13 @@ $(function() {
     var $message = $('<span class="message">').text(message);
     var $container = $('<div class="message-container">');
     $container.append($user).append($message);
+    if(attachiments[0]) {
+      var url = `https://res.cloudinary.com/cx-mobile-team/${attachiments[0].type}/upload/c_fill,h_300,w_400/${attachiments[0].publicId}`
+      var src = `${url}.mp4`
+      var poster = `${url}.jpg`
+      var $video = $('<video>').attr('src', src).attr('poster', poster)
+      $container.append($('<br>')).append($video)
+    }
     $chatWindow.append($container);
     $chatWindow.scrollTop($chatWindow[0].scrollHeight);
   }
@@ -120,7 +127,12 @@ $(function() {
 
     // Listen for new messages sent to the channel
     generalChannel.on('messageAdded', function(message) {
-      printMessage(message.author, message.body);
+      console.log(message)
+      printMessage(
+        message.author,
+        message.body,
+        message.attributes.attachiments
+      )
     });
   }
 
@@ -135,9 +147,26 @@ $(function() {
       }
       var file = $('#chat-file')[0].files[0]
       if (file) {
-        var formData = new FormData()
-        formData.append('media', file)
-        generalChannel.sendMessage(formData)
+        /* TwilioのMediaMessageの場合 */
+
+        // var formData = new FormData()
+        // formData.append('file', file)
+        // generalChannel.sendMessage(formData)
+
+        /* Cloudinaryの場合 */
+
+        uploadFile(file, (response) => {
+          const option = {
+            attachiments: [
+              {
+                type: 'video',
+                assetId: response.asset_id,
+                publicId: response.public_id,
+              },
+            ],
+          }
+          generalChannel.sendMessage($input.val(), option)
+        })
       } else {
         generalChannel.sendMessage($input.val())
       }
@@ -160,4 +189,31 @@ $(function() {
       })
     })
   });
+
+  function uploadFile(file, callback) {
+    var cloudName = 'cx-mobile-team'
+    var unsignedUploadPreset = 'xwvrfcus'
+    var url = `https://api.cloudinary.com/v1_1/${cloudName}/upload`
+    var xhr = new XMLHttpRequest()
+    var fd = new FormData()
+    xhr.open('POST', url, true)
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
+    fd.append('upload_preset', unsignedUploadPreset)
+    fd.append('file', file)
+
+    // Update progress (can be used to show progress indicator)
+    xhr.upload.addEventListener('progress', function (e) {
+      console.log(`fileuploadprogress data.loaded: ${e.loaded}, data.total: ${e.total}`)
+    })
+
+    xhr.onreadystatechange = function (e) {
+      if (xhr.readyState == 4 && xhr.status == 200) {
+        // File uploaded successfully
+        var response = JSON.parse(xhr.responseText)
+        console.log(response)
+        callback(response)
+      }
+    }
+    xhr.send(fd)
+  }
 });
